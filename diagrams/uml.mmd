@@ -1,0 +1,48 @@
+classDiagram
+    %% PawPal+ Class Diagram
+    %% Updated to reflect design changes including the DailyPlan class
+
+    class Owner {
+        +str name
+        +int available_time_minutes
+        +get_available_time() int
+        +__init__(name, available_time_minutes)
+    }
+
+    class Pet {
+        +str name
+        +str species
+        +str special_needs
+        +get_info() str
+        +__init__(name, species, special_needs)
+    }
+
+    class CareTask {
+        +str title
+        +int duration_minutes
+        +str priority
+        +get_priority_score() int
+        +__str__() str
+        +__init__(title, duration_minutes, priority)
+    }
+
+    class Scheduler {
+        +create_daily_plan(tasks, owner) DailyPlan
+        +sort_tasks_by_priority(tasks) list
+    }
+
+    class DailyPlan {
+        +list scheduled_tasks
+        +int total_time_used
+        +str explanation
+        +list unscheduled_tasks
+        +add_task(task, start_time) None
+        +get_summary() str
+        +__init__()
+    }
+
+    Owner "1" --> "1..*" Pet : owns
+    Scheduler ..> Owner : uses
+    Scheduler ..> CareTask : uses
+    Scheduler --> DailyPlan : creates
+    DailyPlan "1" o-- "*" CareTask : contains
