@@ -15,11 +15,8 @@
 The initial design includes four main classes:
 
 1. **Owner** - Represents the pet owner. Stores owner name and daily available time (in minutes). Responsible for knowing how much time is available for pet care.
-
 2. **Pet** - Represents a pet. Stores pet name, species, and any special needs or preferences. Responsible for maintaining pet information.
-
 3. **CareTask** - Represents a single care task (walk, feeding, medication, etc.). Stores task title, duration (minutes), and priority level (low/medium/high). Responsible for describing what needs to be done.
-
 4. **Scheduler** - The scheduling engine. Takes a list of CareTask objects and the Owner's available time, then produces an optimized daily plan. Responsible for deciding which tasks to schedule and in what order based on priority and time constraints.
 
 **b. Design changes**
@@ -38,28 +35,19 @@ Initially, the Scheduler was designed to return a simple list of CareTask object
 
 - A list of scheduled tasks with start times
 - Total time allocated
-- An explanation of the scheduling decisions (e.g., "High priority tasks scheduled first")
+- An explanation of the scheduling decisions
 - Any tasks that couldn't fit in the available time
-
-This made the Scheduler's output more informative and easier for the UI to display.
 
 **Design change: Added missing relationships and validation (based on AI review)**
 
 After reviewing the initial skeleton code with AI assistance, I identified several missing relationships and potential issues:
 
-1. **Added Owner-Pet relationship**: The Owner class now includes a `pets: List[Pet]` attribute to track which pets they own, matching the UML relationship "Owner owns 1..\* Pet"
-
-2. **Added Pet-Task association**: CareTask now has an optional `pet: Optional[Pet]` field to link tasks to specific pets. This is important for multi-pet households where you need to track which task belongs to which pet.
-
-3. **Replaced string priority with Enum**: Changed from `priority: str` to `priority: Priority` using an Enum (LOW=1, MEDIUM=2, HIGH=3). This prevents typos and makes priority comparison more reliable.
-
-4. **Added start time to Owner**: Added `start_time_hour: int` to specify when the day begins (e.g., 8 AM), which is needed to calculate actual clock times for scheduled tasks.
-
-5. **Added input validation**: Implemented `__post_init__()` methods in Owner and CareTask to validate data (e.g., no negative durations, valid hour ranges).
-
-6. **Clarified time format**: Documented that start times in DailyPlan should use "HH:MM" format (e.g., "08:30") for consistency.
-
-**Why these changes mattered**: The initial design had the right classes but missed important relationships between them. Without linking tasks to pets, the system couldn't handle multi-pet scenarios. Using strings for priority was error-prone. These changes made the system more robust and better matched real-world requirements.
+1. **Added Owner-Pet relationship**: The Owner class now includes a `pets: List[Pet]` attribute
+2. **Added Pet-Task association**: CareTask now has an optional `pet: Optional[Pet]` field
+3. **Replaced string priority with Enum**: Changed from `priority: str` to `priority: Priority`
+4. **Added start time to Owner**: Added `start_time_hour: int` to specify when the day begins
+5. **Added input validation**: Implemented `__post_init__()` methods in Owner and CareTask
+6. **Added recurring and due_date fields**: CareTask now supports daily/weekly recurrence using `timedelta`
 
 ---
 
@@ -67,8 +55,13 @@ After reviewing the initial skeleton code with AI assistance, I identified sever
 
 **a. Constraints and priorities**
 
-- What constraints does your scheduler consider (for example: time, priority, preferences)?
-- How did you decide which constraints mattered most?
+The scheduler considers three main constraints:
+
+- **Time budget** — The owner's `available_time_minutes` is the hard limit. Tasks that don't fit are moved to `unscheduled_tasks`.
+- **Priority** — Tasks are sorted HIGH → MEDIUM → LOW using the `Priority` enum's numeric value.
+- **Duration** — Within the same priority level, shorter tasks are scheduled first to maximize the number of tasks that fit.
+
+I decided priority mattered most because a pet's health needs (feeding, medication) should never be skipped due to time — they should always be scheduled before lower-priority enrichment tasks like playtime.
 
 ## 2b. Tradeoffs
 
@@ -78,17 +71,28 @@ only compares adjacent pairs. A more robust approach would build a full timeline
 overlapping windows — but for a daily pet care schedule with 5-10 tasks, this simpler version
 is fast enough and easier to maintain.
 
+---
+
 ## 3. AI Collaboration
 
 **a. How you used AI**
 
-- How did you use AI tools during this project (for example: design brainstorming, debugging, refactoring)?
-- What kinds of prompts or questions were most helpful?
+I used Claude as an AI coding assistant throughout the project across several areas:
+
+- **Design brainstorming** — Asked Claude to review my UML and identify missing relationships (e.g., the Pet-Task link and Priority enum)
+- **Code generation** — Used Claude to generate class stubs, method implementations, and the full test suite
+- **Debugging** — When pytest collected 0 items or `sys.path` errors appeared, Claude helped diagnose the root cause quickly
+- **Refactoring** — Asked Claude to suggest a more Pythonic version of `detect_conflicts` using `itertools.combinations`
+
+The most helpful prompts were specific ones like: _"Here is my current `detect_conflicts` method — how could this be simplified for better readability or performance?"_ rather than vague ones like _"improve my code."_
 
 **b. Judgment and verification**
 
-- Describe one moment where you did not accept an AI suggestion as-is.
-- How did you evaluate or verify what the AI suggested?
+When Claude suggested replacing `detect_conflicts` with an `itertools.combinations` version, I evaluated both versions side by side. The `itertools` version was more concise but harder to read for someone new to Python. Since this is a learning project and readability matters more than cleverness here, I kept the original nested loop version. This was a deliberate tradeoff — I chose the version a junior developer could understand and maintain over the "more Pythonic" one.
+
+I also rejected Claude's initial suggestion to use `cat > file << 'EOF'` in the terminal for editing files, since it kept causing heredoc issues on my Mac. I switched to editing files directly in VS Code instead.
+
+Using **separate chat sessions** for different phases (design, implementation, testing, reflection) helped me stay focused. Each session had a clear scope and I wasn't dragging unrelated context from earlier phases into later ones. It also helped me treat each phase as a fresh problem rather than continuing to patch the same growing conversation.
 
 ---
 
@@ -96,13 +100,34 @@ is fast enough and easier to maintain.
 
 **a. What you tested**
 
-- What behaviors did you test?
-- Why were these tests important?
+I wrote 14 automated tests covering:
+
+- **Task completion** — `mark_complete()` sets `completed` to `True`
+- **Pet task list** — `add_task()` increases the pet's task count
+- **Sorting by priority** — HIGH priority tasks come before LOW
+- **Sorting by time** — `sort_by_time()` returns tasks in chronological HH:MM order
+- **Priority + duration sort** — shorter tasks first within the same priority
+- **Filter by pet name** — only tasks for the named pet are returned
+- **Filter by completion status** — completed/incomplete tasks filtered correctly
+- **Daily recurring** — completing a daily task creates next task due tomorrow
+- **Weekly recurring** — completing a weekly task creates next task due next week
+- **Non-recurring** — completing a one-off task returns `None`
+- **No conflicts** — sequential tasks produce no conflict warnings
+- **Zero time budget** — owner with 0 minutes schedules nothing
+- **Empty pet filter** — filtering for a pet with no tasks returns an empty list
+
+These tests mattered because they verified both happy paths and edge cases. Without them, bugs in recurring logic or filtering could go unnoticed until a user hit them in production.
 
 **b. Confidence**
 
-- How confident are you that your scheduler works correctly?
-- What edge cases would you test next if you had more time?
+⭐⭐⭐⭐⭐ — All 14 tests pass. I'm confident in the core scheduling, sorting, filtering, and recurring logic.
+
+If I had more time, I would test:
+
+- Two tasks with the exact same start time (hard conflict)
+- An owner with 1 minute available (boundary case)
+- A pet with 20+ tasks to check performance
+- Recurring tasks completing multiple times in sequence
 
 ---
 
@@ -110,12 +135,21 @@ is fast enough and easier to maintain.
 
 **a. What went well**
 
-- What part of this project are you most satisfied with?
+I'm most satisfied with the recurring task logic. The idea that `mark_complete()` returns a new `CareTask` object with a `due_date` calculated using `timedelta` felt elegant — the task itself knows how to create its own successor. It also made the tests clean and easy to write.
+
+The test suite is also something I'm proud of — 14 tests covering sorting, filtering, edge cases, and recurrence gave me real confidence that the system works correctly.
 
 **b. What you would improve**
 
-- If you had another iteration, what would you improve or redesign?
+If I had another iteration, I would:
+
+- Add a proper database or JSON file to persist tasks between sessions (right now everything resets on Streamlit reload)
+- Improve conflict detection to handle non-sequential overlaps
+- Add support for task time windows (e.g., "Feeding must happen between 7–9 AM")
+- Build a multi-pet view in the UI so each pet's schedule is shown separately
 
 **c. Key takeaway**
 
-- What is one important thing you learned about designing systems or working with AI on this project?
+The most important thing I learned is that **AI is a powerful collaborator, but the architect's judgment still matters**. Claude could generate code quickly, but it couldn't decide which tradeoffs were right for my project — only I could. Every suggestion had to be evaluated: Is this readable? Does it fit my design? Does it solve the right problem?
+
+Being the "lead architect" meant I had to understand the code well enough to accept, reject, or modify what the AI produced. The moments where I pushed back — keeping the readable `detect_conflicts` over the `itertools` version, fixing the `sys.path` issue myself in VS Code instead of using `cat` in terminal — were the moments where I learned the most. AI accelerates the work, but the human has to stay in the driver's seat.
