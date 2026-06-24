@@ -44,14 +44,25 @@ pip install -r requirements.txt
 
 ## 🖥️ Sample Output
 
-Paste a sample of your app's CLI or Streamlit output here so a reader can see what a generated plan looks like:
+Output from running `python main.py`:
 
 ```
-# e.g.:
-# Daily plan for Biscuit (Golden Retriever):
-#   08:00 — Morning walk (30 min) [priority: high]
-#   09:00 — Feeding (10 min) [priority: high]
-#   ...
+========================================
+       🐾 TODAY'S SCHEDULE — PawPal+
+========================================
+Owner : Love
+Pets  : Buddy, Whiskers
+Budget: 120 mins
+
+  08:00  [HIGH  ]  Morning Walk (30 min) — Buddy
+  08:30  [HIGH  ]  Feeding (10 min) — Whiskers
+  08:40  [MEDIUM]  Grooming Session (20 min) — Buddy
+  09:00  [MEDIUM]  Litter Box Clean (10 min) — Whiskers
+  09:10  [LOW   ]  Playtime (15 min) — Buddy
+----------------------------------------
+  Total time used : 85 min
+  Time remaining  : 35 min
+========================================
 ```
 
 ## 🧪 Testing PawPal+
@@ -72,14 +83,14 @@ Sample test output:
 
 ## 📐 Smarter Scheduling
 
-> Fill in once you've implemented scheduling logic.
-
-| Feature | Method(s) | Notes |
-|---------|-----------|-------|
-| Task sorting | | e.g., by priority, duration |
-| Filtering | | e.g., skip tasks if time runs out |
-| Conflict handling | | e.g., overlapping time slots |
-| Recurring tasks | | e.g., daily vs. weekly |
+| Feature                     | Method(s)                               | Notes                                                                             |
+| --------------------------- | --------------------------------------- | --------------------------------------------------------------------------------- |
+| Sort by priority + duration | `Scheduler.sort_tasks_by_priority()`    | High priority first; shorter tasks first within same priority                     |
+| Sort by time                | `Scheduler.sort_by_time()`              | Sorts scheduled tasks by HH:MM start time using lambda key                        |
+| Filter by pet               | `Scheduler.filter_tasks(pet_name=...)`  | Returns only tasks assigned to a specific pet                                     |
+| Filter by status            | `Scheduler.filter_tasks(completed=...)` | Returns only completed or incomplete tasks                                        |
+| Conflict detection          | `Scheduler.detect_conflicts()`          | Flags tasks where start time falls before previous task ends                      |
+| Recurring tasks             | `CareTask.mark_complete()`              | Returns a new CareTask due tomorrow (daily) or next week (weekly) using timedelta |
 
 ## 📸 Demo Walkthrough
 
@@ -91,4 +102,4 @@ Describe your app in numbered steps so a reader can follow along without watchin
 4. <!-- Describe this step -->
 5. <!-- Add more steps as needed -->
 
-**Screenshot or video** *(optional)*: <!-- Insert a screenshot or link to a demo video here -->
+**Screenshot or video** _(optional)_: <!-- Insert a screenshot or link to a demo video here -->

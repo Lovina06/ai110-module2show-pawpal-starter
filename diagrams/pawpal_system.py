@@ -6,6 +6,7 @@ Class skeletons based on UML design
 from dataclasses import dataclass, field
 from typing import List, Optional
 from enum import Enum
+from datetime import date, timedelta
 
 
 class Priority(Enum):
@@ -67,15 +68,36 @@ class CareTask:
     priority: Priority
     pet: Optional['Pet'] = None
     completed: bool = False
+    recurring: str = "none"  # "none", "daily", "weekly"
+    due_date: date = field(default_factory=date.today)
 
     def __post_init__(self):
         """Validate that task duration is a positive number."""
         if self.duration_minutes <= 0:
             raise ValueError("Task duration must be positive")
 
-    def mark_complete(self) -> None:
-        """Mark this task as completed by setting completed to True."""
+    def mark_complete(self) -> Optional['CareTask']:
+        """Mark task complete and return a new instance if recurring, else None."""
         self.completed = True
+        if self.recurring == "daily":
+            return CareTask(
+                title=self.title,
+                duration_minutes=self.duration_minutes,
+                priority=self.priority,
+                pet=self.pet,
+                recurring=self.recurring,
+                due_date=self.due_date + timedelta(days=1)
+            )
+        elif self.recurring == "weekly":
+            return CareTask(
+                title=self.title,
+                duration_minutes=self.duration_minutes,
+                priority=self.priority,
+                pet=self.pet,
+                recurring=self.recurring,
+                due_date=self.due_date + timedelta(weeks=1)
+            )
+        return None
 
     def get_priority_score(self) -> int:
         """Return the numeric priority value for use in sorting."""
@@ -85,7 +107,8 @@ class CareTask:
         """Return a human-readable string representation of the task."""
         pet_name = self.pet.name if self.pet else "General"
         status = "✅" if self.completed else "⬜"
-        return f"{status} [{self.priority.name}] {self.title} ({self.duration_minutes} min) — {pet_name}"
+        recur = f" [{self.recurring}]" if self.recurring != "none" else ""
+        return f"{status} [{self.priority.name}] {self.title} ({self.duration_minutes} min) — {pet_name}{recur}"
 
 
 @dataclass
@@ -95,6 +118,7 @@ class DailyPlan:
     total_time_used: int = 0
     explanation: str = ""
     unscheduled_tasks: List[CareTask] = field(default_factory=list)
+    conflicts: List[str] = field(default_factory=list)
 
     def add_task(self, task: CareTask, start_time_str: str) -> None:
         """Append a task and its start time to the scheduled tasks list."""
@@ -112,6 +136,10 @@ class DailyPlan:
             lines.append("\n  ⚠️  Could not schedule:")
             for task in self.unscheduled_tasks:
                 lines.append(f"    - {task.title}")
+        if self.conflicts:
+            lines.append("\n  ❌ Conflicts detected:")
+            for c in self.conflicts:
+                lines.append(f"    - {c}")
         lines.append("-" * 40)
         lines.append(f"  Total time used : {self.total_time_used} min")
         if self.explanation:
@@ -124,8 +152,41 @@ class Scheduler:
     """Scheduling engine that creates optimized daily plans."""
 
     def sort_tasks_by_priority(self, tasks: List[CareTask]) -> List[CareTask]:
-        """Sort and return tasks ordered from highest to lowest priority."""
-        return sorted(tasks, key=lambda t: t.priority.value, reverse=True)
+        """Sort tasks by priority (high to low), then by duration (short to long)."""
+        return sorted(tasks, key=lambda t: (-t.priority.value, t.duration_minutes))
+
+    def sort_by_time(self, plan: DailyPlan) -> List[tuple]:
+        """Sort scheduled tasks by their start time in HH:MM format."""
+        return sorted(plan.scheduled_tasks, key=lambda x: x[1])
+
+    def filter_tasks(self, tasks: List[CareTask], pet_name: str = None, completed: bool = None) -> List[CareTask]:
+        """Filter tasks by pet name and/or completion status."""
+        result = tasks
+        if pet_name is not None:
+            result = [t for t in result if t.pet and t.pet.name == pet_name]
+        if completed is not None:
+            result = [t for t in result if t.completed == completed]
+        return result
+
+    def detect_conflicts(self, plan: DailyPlan) -> List[str]:
+        """Detect overlapping tasks and return a list of conflict descriptions."""
+        conflicts = []
+        tasks_with_times = plan.scheduled_tasks
+        for i in range(len(tasks_with_times)):
+            task_a, start_a = tasks_with_times[i]
+            end_a = self._time_to_minutes(start_a) + task_a.duration_minutes
+            for j in range(i + 1, len(tasks_with_times)):
+                task_b, start_b = tasks_with_times[j]
+                start_b_min = self._time_to_minutes(start_b)
+                if start_b_min < end_a:
+                    conflicts.append(
+                        f"'{task_a.title}' and '{task_b.title}' overlap at {start_b}")
+        return conflicts
+
+    def _time_to_minutes(self, time_str: str) -> int:
+        """Convert HH:MM string to total minutes since midnight."""
+        h, m = map(int, time_str.split(":"))
+        return h * 60 + m
 
     def create_daily_plan(self, tasks: List[CareTask], owner: Owner) -> DailyPlan:
         """Build and return a DailyPlan by scheduling tasks within the owner's time budget."""
@@ -146,5 +207,6 @@ class Scheduler:
             else:
                 plan.unscheduled_tasks.append(task)
 
+        plan.conflicts = self.detect_conflicts(plan)
         plan.explanation = f"{time_left} min remaining after scheduling."
         return plan

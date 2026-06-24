@@ -2,11 +2,21 @@ classDiagram
     %% PawPal+ Class Diagram
     %% Updated to reflect design changes including the DailyPlan class
 
+    class Priority {
+        <<enumeration>>
+        LOW
+        MEDIUM
+        HIGH
+    }
+
     class Owner {
         +str name
         +int available_time_minutes
+        +List~Pet~ pets
+        +int start_time_hour
         +get_available_time() int
-        +__init__(name, available_time_minutes)
+        +add_pet(pet) None
+        +__post_init__() None
     }
 
     class Pet {
@@ -14,16 +24,16 @@ classDiagram
         +str species
         +str special_needs
         +get_info() str
-        +__init__(name, species, special_needs)
     }
 
     class CareTask {
         +str title
         +int duration_minutes
-        +str priority
+        +Priority priority
+        +Optional~Pet~ pet
         +get_priority_score() int
         +__str__() str
-        +__init__(title, duration_minutes, priority)
+        +__post_init__() None
     }
 
     class Scheduler {
@@ -42,6 +52,8 @@ classDiagram
     }
 
     Owner "1" --> "1..*" Pet : owns
+    CareTask --> Priority : uses
+    CareTask "0..*" --> "0..1" Pet : for
     Scheduler ..> Owner : uses
     Scheduler ..> CareTask : uses
     Scheduler --> DailyPlan : creates
