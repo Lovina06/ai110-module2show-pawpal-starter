@@ -68,18 +68,27 @@ Budget: 120 mins
 ## 🧪 Testing PawPal+
 
 ```bash
-# Run the full test suite:
-pytest
-
-# Run with coverage:
-pytest --cov
+python3 -m pytest tests/test_pawpal.py -v
 ```
 
-Sample test output:
+### What the tests cover
 
-```
-# Paste your pytest output here
-```
+- **Task completion** — `mark_complete()` sets `completed` to `True`
+- **Pet task list** — `add_task()` increases pet's task count
+- **Sorting by priority** — HIGH priority tasks come before LOW
+- **Sorting by time** — `sort_by_time()` returns tasks in chronological HH:MM order
+- **Priority + duration sort** — shorter tasks first within same priority level
+- **Filter by pet** — only tasks for the named pet are returned
+- **Filter by status** — completed/incomplete tasks filtered correctly
+- **Edge case: no matching pet** — filter returns empty list
+- **Daily recurring** — completing a daily task creates next task due tomorrow
+- **Weekly recurring** — completing a weekly task creates next task due next week
+- **Non-recurring** — completing a one-off task returns `None`
+- **No conflicts** — sequential tasks produce no conflict warnings
+- **Zero time budget** — owner with 0 minutes skips all tasks
+- **Empty pet filter** — pet with no tasks returns empty list
+
+### Sample test output
 
 ## 📐 Smarter Scheduling
 
